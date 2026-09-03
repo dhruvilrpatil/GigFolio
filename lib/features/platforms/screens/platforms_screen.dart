@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/models.dart';
+import '../../../shared/providers/auth_providers.dart';
 
 final platformsProvider = StateNotifierProvider<PlatformsNotifier, List<PlatformConnection>>((ref) {
   return PlatformsNotifier();
