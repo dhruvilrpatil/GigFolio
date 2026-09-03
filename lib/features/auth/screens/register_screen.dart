@@ -57,7 +57,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         },
       );
 
-      if (response.user != null && mounted) {
+      if (response.user != null) {
         // Sync user profile & baseline score in Supabase DB
         await ref.read(userDbServiceProvider).syncUserRecord(
               response.user!,
@@ -68,14 +68,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ref.invalidate(userProfileProvider);
         ref.invalidate(userReputationScoreProvider);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account created successfully!'),
-            backgroundColor: AppColors.primary,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Account created successfully!'),
+              backgroundColor: AppColors.primary,
+            ),
+          );
 
-        context.go(AppConstants.routeOnboarding);
+          context.go(AppConstants.routeDashboard);
+        }
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -105,9 +107,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Future<void> _handleGoogleSignIn() async {
     try {
       setState(() => _isLoading = true);
+      final redirectUrl = kIsWeb
+          ? Uri.base.origin
+          : 'https://kblhngnyyaxphzecftet.supabase.co/auth/v1/callback';
+
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: 'https://kblhngnyyaxphzecftet.supabase.co/auth/v1/callback',
+        redirectTo: redirectUrl,
       );
     } catch (e) {
       if (mounted) {

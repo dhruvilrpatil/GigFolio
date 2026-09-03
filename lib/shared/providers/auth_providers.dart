@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -10,8 +11,30 @@ final supabaseClientProvider = Provider<SupabaseClient>((ref) {
 
 /// Stream of Auth State Changes (login, logout, token refresh)
 final authStateChangesProvider = StreamProvider<AuthState>((ref) {
-  return ref.watch(supabaseClientProvider).auth.onAuthStateChange;
+  final client = ref.watch(supabaseClientProvider);
+  return client.auth.onAuthStateChange;
 });
+
+/// Listenable for GoRouter refreshListenable
+final authRefreshListenableProvider = Provider<Listenable>((ref) {
+  final client = ref.watch(supabaseClientProvider);
+  return GoRouterRefreshStream(client.auth.onAuthStateChange);
+});
+
+class GoRouterRefreshStream extends ChangeNotifier {
+  late final StreamSubscription<dynamic> _subscription;
+
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    notifyListeners();
+    _subscription = stream.asBroadcastStream().listen((_) => notifyListeners());
+  }
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
+}
 
 /// Current authenticated user
 final currentUserProvider = Provider<User?>((ref) {
@@ -221,4 +244,18 @@ final userReputationScoreProvider = FutureProvider<ReputationScore>((ref) async 
   final user = ref.watch(currentUserProvider);
   final dbService = ref.watch(userDbServiceProvider);
   return dbService.fetchReputationScore(user);
+});
+
+/// Auto-syncs profile/reputation when auth state turns signedIn
+final authStateSyncListenerProvider = Provider<void>((ref) {
+  final authStateAsync = ref.watch(authStateChangesProvider);
+  final user = authStateAsync.value?.session?.user;
+  if (user != null) {
+    Future.microtask(() async {
+      final dbService = ref.read(userDbServiceProvider);
+      await dbService.syncUserRecord(user);
+      ref.invalidate(userProfileProvider);
+      ref.invalidate(userReputationScoreProvider);
+    });
+  }
 });

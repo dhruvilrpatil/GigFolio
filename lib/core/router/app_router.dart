@@ -14,15 +14,37 @@ import '../../features/reputation/screens/reputation_screen.dart';
 import '../../features/platforms/screens/platforms_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../shared/widgets/main_shell.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../shared/providers/auth_providers.dart';
 import '../constants/app_constants.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 final _shellKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
+  // Ensure sync listener is active
+  ref.watch(authStateSyncListenerProvider);
+  final refreshListenable = ref.watch(authRefreshListenableProvider);
+
   return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: AppConstants.routeSplash,
+    refreshListenable: refreshListenable,
+    redirect: (context, state) {
+      final session = Supabase.instance.client.auth.currentSession;
+      final isLoggedIn = session != null;
+      final location = state.matchedLocation;
+
+      final isAuthPage = location == AppConstants.routeWelcome ||
+          location == AppConstants.routeLogin ||
+          location == AppConstants.routeRegister ||
+          location == AppConstants.routeForgotPassword;
+
+      if (isLoggedIn && isAuthPage) {
+        return AppConstants.routeDashboard;
+      }
+      return null;
+    },
     debugLogDiagnostics: false,
     routes: [
       // ─── Splash ────────────────────────────────────────────────────────────

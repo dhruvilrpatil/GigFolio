@@ -41,7 +41,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         password: _passwordCtrl.text.trim(),
       );
 
-      if (response.user != null && mounted) {
+      if (response.user != null) {
         // Sync user profile & score in Supabase DB per individual account
         await ref.read(userDbServiceProvider).syncUserRecord(response.user!);
         
@@ -49,7 +49,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ref.invalidate(userProfileProvider);
         ref.invalidate(userReputationScoreProvider);
 
-        context.go(AppConstants.routeDashboard);
+        if (mounted) {
+          context.go(AppConstants.routeDashboard);
+        }
       }
     } on AuthException catch (e) {
       if (mounted) {
@@ -79,9 +81,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleGoogleSignIn() async {
     try {
       setState(() => _isLoading = true);
+      final redirectUrl = kIsWeb
+          ? Uri.base.origin
+          : 'https://kblhngnyyaxphzecftet.supabase.co/auth/v1/callback';
+
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: 'https://kblhngnyyaxphzecftet.supabase.co/auth/v1/callback',
+        redirectTo: redirectUrl,
       );
     } catch (e) {
       if (mounted) {
