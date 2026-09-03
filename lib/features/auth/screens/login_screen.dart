@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../shared/widgets/gf_text_field.dart';
 import '../../../shared/widgets/auth_widgets.dart';
+import '../../../shared/providers/auth_providers.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -31,10 +34,68 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1200)); // TODO: Supabase auth
-    if (mounted) {
-      setState(() => _isLoading = false);
-      context.go(AppConstants.routeDashboard);
+
+    try {
+      final response = await Supabase.instance.client.auth.signInWithPassword(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text.trim(),
+      );
+
+      if (response.user != null && mounted) {
+        // Sync user profile & score in Supabase DB per individual account
+        await ref.read(userDbServiceProvider).syncUserRecord(response.user!);
+        
+        // Refresh local cache for logged-in user
+        ref.invalidate(userProfileProvider);
+        ref.invalidate(userReputationScoreProvider);
+
+        context.go(AppConstants.routeDashboard);
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Login failed: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    try {
+      setState(() => _isLoading = true);
+      await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'https://kblhngnyyaxphzecftet.supabase.co/auth/v1/callback',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google Sign-In error: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -45,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Back button + header
+            // Back button
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: Row(
@@ -82,10 +143,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       ).animate(delay: 100.ms).fadeIn(duration: 400.ms).slideY(begin: 0.2),
                       const SizedBox(height: 8),
                       Text(
-                        'Login using your ${AppConstants.gigfolioIdBrand} to continue.',
+                        'Login to access your individual GigFolio profile and score.',
                         style: AppTextStyles.bodyLg.copyWith(color: AppColors.textSecondary),
                       ).animate(delay: 150.ms).fadeIn(duration: 400.ms),
-                      const SizedBox(height: 36),
+                      const SizedBox(height: 28),
+
+                      // Google Sign In Button
+                      GoogleSignInButton(
+                        onPressed: _handleGoogleSignIn,
+                        isLoading: _isLoading,
+                      ).animate(delay: 180.ms).fadeIn(duration: 300.ms),
+                      const SizedBox(height: 24),
+
+                      const OrDivider().animate(delay: 200.ms).fadeIn(duration: 300.ms),
+                      const SizedBox(height: 24),
 
                       // Email
                       GFTextField(
@@ -99,7 +170,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           if (!v.contains('@')) return 'Enter a valid email';
                           return null;
                         },
-                      ).animate(delay: 200.ms).fadeIn(duration: 300.ms),
+                      ).animate(delay: 230.ms).fadeIn(duration: 300.ms),
                       const SizedBox(height: 16),
 
                       // Password
@@ -118,7 +189,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           if (v.length < 6) return 'Password must be at least 6 characters';
                           return null;
                         },
-                      ).animate(delay: 250.ms).fadeIn(duration: 300.ms),
+                      ).animate(delay: 260.ms).fadeIn(duration: 300.ms),
                       const SizedBox(height: 12),
 
                       // Forgot password
@@ -152,8 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     borderRadius: BorderRadius.circular(50),
                                   ),
                                 ),
-                                child: Text('Login using ${AppConstants.gigfolioIdBrand}',
-                                    style: AppTextStyles.button),
+                                child: Text('Login with Email', style: AppTextStyles.button),
                               ),
                       ).animate(delay: 350.ms).fadeIn(duration: 300.ms).slideY(begin: 0.2),
 
@@ -190,5 +260,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
-// Private widgets removed — use AuthBackButton and AuthLoadingButton from shared/widgets/auth_widgets.dart

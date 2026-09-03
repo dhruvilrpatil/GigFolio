@@ -1,41 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
-import '../../../core/constants/app_constants.dart';
-import '../../../shared/models/models.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../shared/providers/auth_providers.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
-
-  // Mock data — will be replaced by Supabase/API
-  static final _mockProfile = const WorkerProfile(
-    id: 'w-001',
-    userId: 'u-001',
-    legalName: 'Aarav Sharma',
-    email: 'aarav@example.com',
-    phone: '+91 98765 43210',
-    location: 'Bangalore, IN',
-    skills: ['Delivery', 'Driving', 'Customer Support'],
-    workCategories: ['Transport & Delivery'],
-    profileCompleteness: 0.96,
-    identityStatus: 'Not Verified',
-  );
-
-  static final _mockScore = ReputationScore(
-    compositeScore: 782,
-    tag: ReputationTag.excellent,
-    confidence: ConfidenceTier.high,
-    confidenceIndex: 0.94,
-    isProvisional: false,
-    subscoreRating: 0.91,
-    subscoreVolume: 0.85,
-    subscoreReliability: 0.92,
-    subscoreConsistency: 0.78,
-    subscoreSkills: 0.60,
-    message: '',
-  );
 
   static final _mockPlatforms = [
     const PlatformConnection(
@@ -56,7 +23,34 @@ class DashboardScreen extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(userProfileProvider);
+    final scoreAsync = ref.watch(userReputationScoreProvider);
+
+    final profile = profileAsync.value ??
+        const WorkerProfile(
+          id: 'temp',
+          userId: 'temp',
+          legalName: 'Gig Worker',
+          location: 'Mumbai, India',
+          profileCompleteness: 0.85,
+        );
+
+    final score = scoreAsync.value ??
+        const ReputationScore(
+          compositeScore: 4.8,
+          tag: ReputationTag.excellent,
+          confidence: ConfidenceTier.high,
+          confidenceIndex: 0.92,
+          isProvisional: false,
+          subscoreRating: 0.94,
+          subscoreVolume: 0.88,
+          subscoreReliability: 0.95,
+          subscoreConsistency: 0.85,
+          subscoreSkills: 0.75,
+          message: '',
+        );
+
     final greeting = _greeting();
     return Scaffold(
       backgroundColor: AppColors.surfaceCanvas,
@@ -76,7 +70,7 @@ class DashboardScreen extends StatelessWidget {
                   // Avatar
                   GestureDetector(
                     onTap: () => context.go(AppConstants.routeProfile),
-                    child: _Avatar(initials: _mockProfile.initials),
+                    child: _Avatar(initials: profile.initials),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -85,12 +79,12 @@ class DashboardScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '$greeting, ${_mockProfile.legalName.split(' ').first} 👋',
+                          '$greeting, ${profile.legalName.split(' ').first} 👋',
                           style: AppTextStyles.headlineSm,
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          _mockProfile.location ?? '',
+                          profile.location ?? 'Mumbai, India',
                           style: AppTextStyles.bodySm.copyWith(color: AppColors.textSecondary),
                         ),
                       ],
@@ -108,12 +102,12 @@ class DashboardScreen extends StatelessWidget {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 // ── Identity Card ──────────────────────────────────────────────
-                _IdentityCard(profile: _mockProfile, score: _mockScore)
+                _IdentityCard(profile: profile, score: score)
                     .animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
                 const SizedBox(height: 20),
 
                 // ── Score quick view ───────────────────────────────────────────
-                _ScoreCard(score: _mockScore)
+                _ScoreCard(score: score)
                     .animate(delay: 100.ms).fadeIn(duration: 400.ms).slideY(begin: 0.1),
                 const SizedBox(height: 20),
 
@@ -358,7 +352,7 @@ class _IdentityCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                _StatCell(value: '${score.compositeScore}', label: 'Reputation'),
+                _StatCell(value: score.compositeScore.toStringAsFixed(1), label: 'Reputation'),
                 _VertDivider(),
                 _StatCell(value: '4.8 ★', label: 'Rating'),
                 _VertDivider(),
@@ -427,7 +421,7 @@ class _ScoreCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${score.compositeScore}',
+                    score.compositeScore.toStringAsFixed(1),
                     style: AppTextStyles.scoreDisplay.copyWith(color: Colors.white, fontSize: 56),
                   ),
                   const SizedBox(height: 8),

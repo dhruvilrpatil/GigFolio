@@ -5,6 +5,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_constants.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -16,8 +18,14 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 2200), () {
-      if (mounted) context.go(AppConstants.routeWelcome);
+    Future.delayed(const Duration(milliseconds: 1800), () {
+      if (!mounted) return;
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null) {
+        context.go(AppConstants.routeDashboard);
+      } else {
+        context.go(AppConstants.routeWelcome);
+      }
     });
   }
 

@@ -4,26 +4,31 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/models.dart';
 
-class ReputationScreen extends StatelessWidget {
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../shared/providers/auth_providers.dart';
+
+class ReputationScreen extends ConsumerWidget {
   const ReputationScreen({super.key});
 
-  static final _mockScore = ReputationScore(
-    compositeScore: 782,
-    tag: ReputationTag.excellent,
-    confidence: ConfidenceTier.high,
-    confidenceIndex: 0.94,
-    isProvisional: false,
-    subscoreRating: 0.91,
-    subscoreVolume: 0.85,
-    subscoreReliability: 0.92,
-    subscoreConsistency: 0.78,
-    subscoreSkills: 0.60,
-    message: '',
-  );
-
   @override
-  Widget build(BuildContext context) {
-    final score = _mockScore;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scoreAsync = ref.watch(userReputationScoreProvider);
+
+    final score = scoreAsync.value ??
+        const ReputationScore(
+          compositeScore: 4.8,
+          tag: ReputationTag.excellent,
+          confidence: ConfidenceTier.high,
+          confidenceIndex: 0.94,
+          isProvisional: false,
+          subscoreRating: 0.91,
+          subscoreVolume: 0.85,
+          subscoreReliability: 0.92,
+          subscoreConsistency: 0.78,
+          subscoreSkills: 0.60,
+          message: '',
+        );
+
     return Scaffold(
       backgroundColor: AppColors.surfaceCanvas,
       body: CustomScrollView(
@@ -99,7 +104,7 @@ class _HeroScoreBlock extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            '${score.compositeScore}',
+            score.compositeScore.toStringAsFixed(1),
             style: AppTextStyles.scoreDisplay.copyWith(
               color: Colors.white,
               fontSize: 80,
@@ -108,7 +113,7 @@ class _HeroScoreBlock extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'out of 850',
+            'out of 5.0',
             style: AppTextStyles.bodySm.copyWith(color: Colors.white.withOpacity(0.5)),
           ),
           const SizedBox(height: 20),
@@ -167,12 +172,12 @@ class _HeroScoreBlock extends StatelessWidget {
 }
 
 class _ScoreRangeBar extends StatelessWidget {
-  final int score;
+  final double score;
   const _ScoreRangeBar({required this.score});
 
   @override
   Widget build(BuildContext context) {
-    final normalised = (score - 300) / 550;
+    final normalised = score / 5.0;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -183,7 +188,7 @@ class _ScoreRangeBar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Score Range (300 – 850)', style: AppTextStyles.titleMd),
+          Text('Score Range (0.0 – 5.0)', style: AppTextStyles.titleMd),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
@@ -223,8 +228,8 @@ class _ScoreRangeBar extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: const [
-              Text('300', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-              Text('850', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+              Text('0.0', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+              Text('5.0', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             ],
           ),
         ],
@@ -329,11 +334,11 @@ class _ReputationTagsBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tags = [
-      (ReputationTag.excellent, '780 – 850'),
-      (ReputationTag.good, '680 – 779'),
-      (ReputationTag.average, '550 – 679'),
-      (ReputationTag.poor, '420 – 549'),
-      (ReputationTag.worst, '300 – 419'),
+      (ReputationTag.excellent, '4.5 – 5.0'),
+      (ReputationTag.good, '4.0 – 4.4'),
+      (ReputationTag.average, '3.0 – 3.9'),
+      (ReputationTag.poor, '2.0 – 2.9'),
+      (ReputationTag.worst, '0.0 – 1.9'),
     ];
 
     return Container(

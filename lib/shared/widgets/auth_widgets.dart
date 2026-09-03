@@ -48,3 +48,79 @@ class AuthLoadingButton extends StatelessWidget {
     );
   }
 }
+
+/// Google Sign-In Button (Apple-style sleek outline)
+class GoogleSignInButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  final bool isLoading;
+  const GoogleSignInButton({super.key, required this.onPressed, this.isLoading = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: isLoading ? null : onPressed,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 52),
+        backgroundColor: Colors.white,
+        side: const BorderSide(color: AppColors.cardBorder, width: 1.5),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(50),
+        ),
+        elevation: 0,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Google G icon representation
+          Container(
+            width: 22,
+            height: 22,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFF4285F4),
+            ),
+            child: const Text(
+              'G',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Continue with Google',
+            style: AppTextStyles.button.copyWith(
+              color: AppColors.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Divider with "OR" text for Auth screens
+class OrDivider extends StatelessWidget {
+  const OrDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(child: Divider(color: AppColors.hairlineSoft, thickness: 1)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'OR',
+            style: AppTextStyles.eyebrow.copyWith(color: AppColors.textSecondary),
+          ),
+        ),
+        const Expanded(child: Divider(color: AppColors.hairlineSoft, thickness: 1)),
+      ],
+    );
+  }
+}

@@ -5,25 +5,30 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/models.dart';
 
-class ProfileScreen extends StatelessWidget {
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../shared/providers/auth_providers.dart';
+
+class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
-  static final _mockProfile = const WorkerProfile(
-    id: 'w-001',
-    userId: 'u-001',
-    legalName: 'Aarav Sharma',
-    email: 'aarav@example.com',
-    phone: '+91 98765 43210',
-    location: 'Bangalore, IN',
-    skills: ['Delivery', 'Driving', 'Customer Support'],
-    workCategories: ['Transport & Delivery'],
-    profileCompleteness: 0.96,
-    identityStatus: 'Not Verified',
-  );
-
   @override
-  Widget build(BuildContext context) {
-    final profile = _mockProfile;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(userProfileProvider);
+
+    final profile = profileAsync.value ??
+        const WorkerProfile(
+          id: 'temp',
+          userId: 'temp',
+          legalName: 'Gig Worker',
+          email: 'user@example.com',
+          phone: '+91 98765 43210',
+          location: 'Mumbai, India',
+          skills: ['Delivery', 'Rideshare'],
+          workCategories: ['Gig Economy'],
+          profileCompleteness: 0.85,
+          identityStatus: 'Verified',
+        );
+
     return Scaffold(
       backgroundColor: AppColors.surfaceCanvas,
       body: CustomScrollView(

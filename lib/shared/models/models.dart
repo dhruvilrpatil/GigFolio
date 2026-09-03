@@ -75,7 +75,7 @@ extension ConfidenceTierX on ConfidenceTier {
 }
 
 class ReputationScore {
-  final int compositeScore;
+  final double compositeScore;
   final ReputationTag tag;
   final ConfidenceTier confidence;
   final double confidenceIndex;
@@ -118,7 +118,7 @@ class ReputationScore {
     );
   }
 
-  static ReputationTag tagFromScore(int score) {
+  static ReputationTag tagFromScore(double score) {
     if (score >= ReputationConfig.thresholdExcellent) return ReputationTag.excellent;
     if (score >= ReputationConfig.thresholdGood) return ReputationTag.good;
     if (score >= ReputationConfig.thresholdAverage) return ReputationTag.average;

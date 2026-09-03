@@ -7,12 +7,12 @@ class ReputationConfig {
   static const double priorWeight = 25.0; // C (confidence threshold)
 
   // Score range
-  static const int scoreMin = 300;
-  static const int scoreMax = 850;
-  static const int scoreRange = 550;
+  static const double scoreMin = 0.0;
+  static const double scoreMax = 5.0;
+  static const double scoreRange = 5.0;
 
   // Provisional baseline (new worker)
-  static const int provisionalScore = 575;
+  static const double provisionalScore = 2.5;
 
   // Subscore weights
   static const double weightRating = 0.35;
@@ -28,10 +28,10 @@ class ReputationConfig {
   static const int scoreTtlSeconds = 300;
 
   // Reputation tag thresholds
-  static const int thresholdExcellent = 780;
-  static const int thresholdGood = 680;
-  static const int thresholdAverage = 550;
-  static const int thresholdPoor = 420;
+  static const double thresholdExcellent = 4.5;
+  static const double thresholdGood = 4.0;
+  static const double thresholdAverage = 3.0;
+  static const double thresholdPoor = 2.0;
   // Below 420 → Worst
 
   // Confidence tiers
