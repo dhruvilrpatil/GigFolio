@@ -38,12 +38,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthPage = location == AppConstants.routeWelcome ||
           location == AppConstants.routeLogin ||
           location == AppConstants.routeRegister ||
-          location == AppConstants.routeForgotPassword;
+          location == AppConstants.routeForgotPassword ||
+          location == AppConstants.routeSplash;
 
       if (isLoggedIn && isAuthPage) {
         return AppConstants.routeDashboard;
       }
-      if (!isLoggedIn && !isAuthPage && location != AppConstants.routeSplash) {
+      if (!isLoggedIn && !isAuthPage) {
         return AppConstants.routeWelcome;
       }
       return null;

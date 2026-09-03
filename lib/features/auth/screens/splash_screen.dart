@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -15,10 +16,18 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  late final StreamSubscription<AuthState> _authSub;
+
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 1800), () {
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.session != null && mounted) {
+        context.go(AppConstants.routeDashboard);
+      }
+    });
+
+    Future.delayed(const Duration(milliseconds: 1500), () {
       if (!mounted) return;
       final session = Supabase.instance.client.auth.currentSession;
       if (session != null) {
@@ -27,6 +36,12 @@ class _SplashScreenState extends State<SplashScreen> {
         context.go(AppConstants.routeWelcome);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _authSub.cancel();
+    super.dispose();
   }
 
   @override
