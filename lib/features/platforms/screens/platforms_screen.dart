@@ -463,7 +463,7 @@ class _PlatformTile extends ConsumerWidget {
                 const SizedBox(height: 20),
 
                 // Input Phone
-                Text('Partner Account Phone Number', style: AppTextStyles.titleSm),
+                Text('Partner Account Phone Number', style: AppTextStyles.titleMd),
                 const SizedBox(height: 8),
                 TextField(
                   controller: phoneController,
@@ -561,7 +561,6 @@ class _PermissionRow extends StatelessWidget {
       ],
     );
   }
-}
 }
 
 class _HowItWorksBlock extends StatelessWidget {
