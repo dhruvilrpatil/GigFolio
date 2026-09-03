@@ -82,19 +82,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleGoogleSignIn() async {
     try {
       setState(() => _isLoading = true);
-      final redirectUrl = kIsWeb
-          ? Uri.base.origin
-          : 'https://kblhngnyyaxphzecftet.supabase.co/auth/v1/callback';
-
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: redirectUrl,
+        redirectTo: kIsWeb ? null : 'https://kblhngnyyaxphzecftet.supabase.co/auth/v1/callback',
       );
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google Auth Error (${e.statusCode ?? '400'}): ${e.message}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Google Sign-In error: $e'),
+            content: Text('Google Sign-In failed: $e'),
             backgroundColor: AppColors.error,
           ),
         );

@@ -43,6 +43,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (isLoggedIn && isAuthPage) {
         return AppConstants.routeDashboard;
       }
+      if (!isLoggedIn && !isAuthPage && location != AppConstants.routeSplash) {
+        return AppConstants.routeWelcome;
+      }
       return null;
     },
     debugLogDiagnostics: false,
