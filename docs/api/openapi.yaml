@@ -1,0 +1,631 @@
+openapi: 3.1.0
+info:
+  title: GigFolio API — Developer 3 Scope
+  description: |
+    API specifications for Developer 3 deliverables in the GigFolio platform:
+    - **Reputation Engine:** Breakdown and composite scoring
+    - **Consent Management & Share Links:** Time-boxed, scope-limited access delegation
+    - **QR Code Generation:** Authoritative backend generation for portable profile sharing
+    - **Enterprise Verification:** Scoped data projection and SD-JWT presentation
+    - **Application Audit Events:** Tamper-resistant, hashed-identifier access logs
+  version: 1.0.0
+  contact:
+    name: GigFolio Engineering Team
+    email: dev@gigfolio.io
+
+servers:
+  - url: https://api.gigfolio.io
+    description: Production API
+  - url: http://localhost:3000
+    description: Local Development Server
+
+paths:
+  /api/v1/reputation/breakdown:
+    get:
+      tags:
+        - Reputation
+      summary: Get worker reputation breakdown
+      description: |
+        Retrieves the composite Bayesian reputation score, confidence indicators,
+        and all 5 sub-vector calculations for the authenticated worker.
+      operationId: getReputationBreakdown
+      security:
+        - BearerAuth:
+            - worker:reputation:read
+      responses:
+        '200':
+          description: Reputation breakdown retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReputationBreakdownResponse'
+              example:
+                composite_score: 782
+                confidence_index: 0.86
+                confidence_tier: HIGH_CONFIDENCE
+                subscores:
+                  rating_vector: 0.91
+                  volume_vector: 0.77
+                  reliability_vector: 0.94
+                  consistency_vector: 0.68
+                  skills_vector: 0.50
+                normalized_metrics:
+                  total_verified_jobs: 1240
+                  aggregate_completion_rate: 0.98
+                  active_platforms_count: 3
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Reputation score not yet calculated for worker
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/consent/share-links:
+    post:
+      tags:
+        - Consent & Share Links
+      summary: Create a share link with QR code
+      description: |
+        Creates a time-boxed, scope-limited share link. The returned `share_token`
+        is an opaque raw token shown **EXACTLY ONCE**. The backend only persists
+        its SHA-256 hash. TTL is strictly capped at 720 hours.
+      operationId: createShareLink
+      security:
+        - BearerAuth:
+            - worker:consent:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateShareLinkRequest'
+            example:
+              permitted_scopes:
+                - identity:name_only
+                - earnings:monthly_aggregate
+                - reputation:composite_score
+              ttl_hours: 72
+              max_uses: 1
+              passcode: optional-string
+      responses:
+        '201':
+          description: Share link created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareLinkResponse'
+              example:
+                share_token: opaque-raw-token-shown-once
+                share_url: https://gigfolio.io/verify/opaque-raw-token-shown-once
+                qr_code_svg_url: https://gigfolio.io/qr/opaque-raw-token-shown-once.svg
+                permitted_scopes:
+                  - identity:name_only
+                  - earnings:monthly_aggregate
+                  - reputation:composite_score
+                expires_at: '2026-09-06T12:00:00Z'
+        '400':
+          description: Invalid scope or TTL > 720 hours
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Worker account unverified or insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/consent/share-links/{id}:
+    delete:
+      tags:
+        - Consent & Share Links
+      summary: Revoke a share link
+      description: |
+        Revokes a share link immediately. Revocation is propagated to Redis
+        so that subsequent verification attempts are rejected instantly.
+      operationId: revokeShareLink
+      security:
+        - BearerAuth:
+            - worker:consent:delete
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID of the share link to revoke
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Share link revoked successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevokeShareLinkResponse'
+              example:
+                message: Share link revoked successfully.
+                revoked_at: '2026-09-03T18:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Share link not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/organizations/verify-worker:
+    post:
+      tags:
+        - Enterprise Verification
+      summary: Enterprise worker verification
+      description: |
+        Verifies a worker profile using a share token. Returns ONLY consented
+        data fields (projected at query time) accompanied by a key-bound
+        SD-JWT presentation.
+      operationId: verifyWorker
+      security:
+        - OrgApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyWorkerRequest'
+            example:
+              share_token: raw-token-from-qr-or-link
+              access_passcode: optional
+              verifier_nonce: cryptographic-challenge-string
+      responses:
+        '200':
+          description: Worker successfully verified and consented claims projected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyWorkerResponse'
+              example:
+                verification_event_id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+                worker:
+                  legal_name: Jane Worker
+                verification_tier: PLATFORM_VERIFIED
+                verified_metrics:
+                  composite_score: 782
+                  confidence_tier: HIGH_CONFIDENCE
+                sd_jwt_presentation: eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJ3b3JrZXIifQ.SIGNATURE~DISCLOSURE~
+        '401':
+          description: Invalid or missing organization API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Wrong passcode, or consent revoked/does not authorize this access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
+          description: Token expired or usage limit already exhausted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/public/workers/{worker_public_id}:
+    get:
+      tags:
+        - Public Worker Lookup
+      summary: Lookup worker by public ID (pointer resolution)
+      description: |
+        Resolves a `worker_public_id` to the minimum discoverable profile.
+        **This is a POINTER, not a bearer credential.**
+
+        Only returns non-sensitive, worker-controlled fields. `worker_public_id` alone grants
+        ZERO data access. To access actual data (reputation, earnings, identity), obtain a
+        share token from the worker and call `POST /api/v1/organizations/verify-worker`.
+      operationId: getPublicWorkerProfile
+      security:
+        - OrgApiKeyAuth: []
+      parameters:
+        - name: worker_public_id
+          in: path
+          required: true
+          description: The stable public UUID the worker shared (NOT their internal DB UUID)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Public profile resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicWorkerProfileResponse'
+              example:
+                worker_public_id: 7f3a2b1c-4e5d-6f7a-8b9c-0d1e2f3a4b5c
+                display_name: Jane W.
+                is_identity_verified: true
+                has_reputation_score: true
+                verification_badge: PLATFORM_VERIFIED
+                data_access_hint: >-
+                  To access actual worker data, obtain a share token from this worker
+                  and call POST /api/v1/organizations/verify-worker.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No GigFolio profile found for this public ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/workers/me/rotate-public-id:
+    post:
+      tags:
+        - Worker Settings
+      summary: Rotate worker public ID
+      description: |
+        Generates a new `worker_public_id` and immediately invalidates the old one.
+        Use when the public ID has been shared with untrusted parties.
+        Internal records (reputation, consent, audit history) are completely unaffected.
+      operationId: rotateWorkerPublicId
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Public ID rotated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RotatePublicIdResponse'
+              example:
+                new_worker_public_id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                previous_public_id: 7f3a2b1c-4e5d-6f7a-8b9c-0d1e2f3a4b5c
+                rotated_at: '2026-09-03T19:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Worker JWT containing worker ID and granted scopes.
+    OrgApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Organization-Key
+      description: Institutional Verifier API Key.
+
+  schemas:
+    ReputationSubscores:
+      type: object
+      required:
+        - rating_vector
+        - volume_vector
+        - reliability_vector
+        - consistency_vector
+        - skills_vector
+      properties:
+        rating_vector:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.91
+        volume_vector:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.77
+        reliability_vector:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.94
+        consistency_vector:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.68
+        skills_vector:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.50
+
+    ReputationNormalizedMetrics:
+      type: object
+      required:
+        - total_verified_jobs
+        - aggregate_completion_rate
+        - active_platforms_count
+      properties:
+        total_verified_jobs:
+          type: integer
+          example: 1240
+        aggregate_completion_rate:
+          type: number
+          format: float
+          example: 0.98
+        active_platforms_count:
+          type: integer
+          example: 3
+
+    ReputationBreakdownResponse:
+      type: object
+      required:
+        - composite_score
+        - confidence_index
+        - confidence_tier
+        - subscores
+        - normalized_metrics
+      properties:
+        composite_score:
+          type: integer
+          minimum: 300
+          maximum: 850
+          example: 782
+        confidence_index:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.86
+        confidence_tier:
+          type: string
+          enum: [LOW, MEDIUM, HIGH_CONFIDENCE]
+          example: HIGH_CONFIDENCE
+        subscores:
+          $ref: '#/components/schemas/ReputationSubscores'
+        normalized_metrics:
+          $ref: '#/components/schemas/ReputationNormalizedMetrics'
+
+    CreateShareLinkRequest:
+      type: object
+      required:
+        - permitted_scopes
+        - ttl_hours
+      properties:
+        permitted_scopes:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          example:
+            - identity:name_only
+            - earnings:monthly_aggregate
+            - reputation:composite_score
+        ttl_hours:
+          type: integer
+          minimum: 1
+          maximum: 720
+          example: 72
+        max_uses:
+          type: integer
+          nullable: true
+          minimum: 1
+          example: 1
+        passcode:
+          type: string
+          example: optional-string
+
+    ShareLinkResponse:
+      type: object
+      required:
+        - share_token
+        - share_url
+        - qr_code_svg_url
+        - permitted_scopes
+        - expires_at
+      properties:
+        share_token:
+          type: string
+          description: Opaque raw token returned exactly once
+          example: opaque-raw-token-shown-once
+        share_url:
+          type: string
+          format: uri
+          example: https://gigfolio.io/verify/opaque-raw-token-shown-once
+        qr_code_svg_url:
+          type: string
+          format: uri
+          example: https://gigfolio.io/qr/opaque-raw-token-shown-once.svg
+        permitted_scopes:
+          type: array
+          items:
+            type: string
+        expires_at:
+          type: string
+          format: date-time
+          example: '2026-09-06T12:00:00Z'
+
+    RevokeShareLinkResponse:
+      type: object
+      required:
+        - message
+        - revoked_at
+      properties:
+        message:
+          type: string
+          example: Share link revoked successfully.
+        revoked_at:
+          type: string
+          format: date-time
+          example: '2026-09-03T18:00:00Z'
+
+    VerifyWorkerRequest:
+      type: object
+      required:
+        - share_token
+        - verifier_nonce
+      properties:
+        share_token:
+          type: string
+          example: raw-token-from-qr-or-link
+        access_passcode:
+          type: string
+          nullable: true
+          example: optional
+        verifier_nonce:
+          type: string
+          example: cryptographic-challenge-string
+        worker_public_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: >-
+            Optional public ID binding. When provided, the backend validates that
+            the share_token belongs to this exact worker, preventing cross-worker
+            token confusion attacks.
+          example: 7f3a2b1c-4e5d-6f7a-8b9c-0d1e2f3a4b5c
+
+    VerifyWorkerResponse:
+      type: object
+      required:
+        - verification_event_id
+        - worker
+        - verification_tier
+        - verified_metrics
+        - sd_jwt_presentation
+      properties:
+        verification_event_id:
+          type: string
+          format: uuid
+          example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        worker:
+          type: object
+          description: Only consented identity fields
+          additionalProperties: true
+        verification_tier:
+          type: string
+          enum: [SELF_REPORTED, PLATFORM_VERIFIED, GOVERNMENT_VERIFIED]
+          example: PLATFORM_VERIFIED
+        verified_metrics:
+          type: object
+          description: Only consented performance metrics
+          additionalProperties: true
+        sd_jwt_presentation:
+          type: string
+          example: eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJ3b3JrZXIifQ.SIGNATURE~DISCLOSURE~
+
+    ErrorResponse:
+      type: object
+      required:
+        - statusCode
+        - message
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string
+        error:
+          type: string
+          nullable: true
+
+    PublicWorkerProfileResponse:
+      type: object
+      required:
+        - worker_public_id
+        - has_reputation_score
+        - data_access_hint
+      properties:
+        worker_public_id:
+          type: string
+          format: uuid
+          description: The stable public handle (NOT the internal worker UUID)
+          example: 7f3a2b1c-4e5d-6f7a-8b9c-0d1e2f3a4b5c
+        display_name:
+          type: string
+          nullable: true
+          example: Jane W.
+        is_identity_verified:
+          type: boolean
+          nullable: true
+          example: true
+        has_reputation_score:
+          type: boolean
+          description: Whether a reputation score exists. Does NOT reveal the score.
+          example: true
+        verification_badge:
+          type: string
+          enum: [VERIFIED, PLATFORM_VERIFIED, UNVERIFIED]
+          nullable: true
+          example: PLATFORM_VERIFIED
+        profile_updated_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-09-03T12:00:00Z'
+        data_access_hint:
+          type: string
+          description: >-
+            Instructs the caller how to access actual data via the verify-worker flow.
+
+    RotatePublicIdResponse:
+      type: object
+      required:
+        - new_worker_public_id
+        - previous_public_id
+        - rotated_at
+      properties:
+        new_worker_public_id:
+          type: string
+          format: uuid
+          description: The newly generated public ID. Share this going forward.
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        previous_public_id:
+          type: string
+          format: uuid
+          description: The old public ID, now permanently invalidated.
+          example: 7f3a2b1c-4e5d-6f7a-8b9c-0d1e2f3a4b5c
+        rotated_at:
+          type: string
+          format: date-time
+          example: '2026-09-03T19:00:00Z'
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Access denied or insufficient scope
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
