@@ -139,6 +139,8 @@ class WorkerProfile {
   final List<String> workCategories;
   final double profileCompleteness;
   final String identityStatus;
+  final String? qrCodeData;
+  final String? qrCodeUrl;
 
   const WorkerProfile({
     required this.id,
@@ -152,7 +154,11 @@ class WorkerProfile {
     this.workCategories = const [],
     this.profileCompleteness = 0.0,
     this.identityStatus = 'Not Verified',
+    this.qrCodeData,
+    this.qrCodeUrl,
   });
+
+  String get effectiveQrCodeData => qrCodeData ?? 'https://gigfolio.app/verify/$userId';
 
   String get initials {
     final parts = legalName.trim().split(' ');

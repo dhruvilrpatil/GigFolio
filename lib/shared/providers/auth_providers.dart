@@ -79,6 +79,7 @@ class UserDbService {
           'work_categories': ['Logistics', 'Gig Economy'],
           'profile_completeness': 0.85,
           'identity_status': 'Verified',
+          'qr_code_data': 'https://gigfolio.app/verify/$userId',
         });
       }
 
@@ -120,6 +121,7 @@ class UserDbService {
         workCategories: ['Gig Economy'],
         profileCompleteness: 0.85,
         identityStatus: 'Verified',
+        qrCodeData: 'https://gigfolio.app/verify/guest',
       );
     }
 
@@ -142,6 +144,8 @@ class UserDbService {
           workCategories: List<String>.from(response['work_categories'] ?? ['Gig Economy']),
           profileCompleteness: (response['profile_completeness'] as num?)?.toDouble() ?? 0.85,
           identityStatus: response['identity_status'] ?? 'Verified',
+          qrCodeData: response['qr_code_data'] ?? 'https://gigfolio.app/verify/${user.id}',
+          qrCodeUrl: response['qr_code_url'],
         );
       }
     } catch (e) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_constants.dart';
@@ -820,5 +821,213 @@ class _VertDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(width: 1, height: 32, color: AppColors.hairlineSoft);
+  }
+}
+
+class _QrPassportCard extends StatelessWidget {
+  final WorkerProfile profile;
+  const _QrPassportCard({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    final qrData = profile.effectiveQrCodeData;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.blockNavy,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1A0D1B2A),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.qr_code_2_rounded, size: 14, color: AppColors.blockMint),
+                    const SizedBox(width: 6),
+                    Text(
+                      'SUPABASE DIGITAL PASSPORT',
+                      style: AppTextStyles.eyebrow.copyWith(color: AppColors.blockMint, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              const Icon(Icons.shield_outlined, color: Colors.white54, size: 18),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              // White styled QR Code container
+              GestureDetector(
+                onTap: () => _showFullQrModal(context, profile, qrData),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white24, width: 2),
+                  ),
+                  child: QrImageView(
+                    data: qrData,
+                    version: QrVersions.auto,
+                    size: 84.0,
+                    eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: Color(0xFF0D1B2A),
+                    ),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: Color(0xFF0D1B2A),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Unique Verification QR',
+                      style: AppTextStyles.titleMd.copyWith(color: Colors.white),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Scannable code dynamically bound to Supabase DB user ID (${profile.userId.length > 8 ? profile.userId.substring(0, 8) : profile.userId}...)',
+                      style: AppTextStyles.bodySm.copyWith(color: Colors.white70, fontSize: 12),
+                    ),
+                    const SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: () => _showFullQrModal(context, profile, qrData),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Expand Passport',
+                            style: AppTextStyles.labelLg.copyWith(color: AppColors.blockMint),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.fullscreen_rounded, size: 16, color: AppColors.blockMint),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFullQrModal(BuildContext context, WorkerProfile profile, String qrData) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.canvas,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.cardBorder,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(profile.legalName, style: AppTextStyles.headlineMd),
+            Text('Verified Gig Worker Passport', style: AppTextStyles.bodySm.copyWith(color: AppColors.textSecondary)),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x14000000), blurRadius: 20, offset: Offset(0, 8)),
+                ],
+              ),
+              child: QrImageView(
+                data: qrData,
+                version: QrVersions.auto,
+                size: 220.0,
+                eyeStyle: const QrEyeStyle(
+                  eyeShape: QrEyeShape.square,
+                  color: Color(0xFF0D1B2A),
+                ),
+                dataModuleStyle: const QrDataModuleStyle(
+                  dataModuleShape: QrDataModuleShape.square,
+                  color: Color(0xFF0D1B2A),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.cardBorder),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.link_rounded, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      qrData,
+                      style: AppTextStyles.bodySm.copyWith(
+                        fontFamily: 'monospace',
+                        color: AppColors.primary,
+                        fontSize: 11,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.pop(ctx),
+                icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
+                label: Text('Close Passport', style: AppTextStyles.button.copyWith(color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
