@@ -170,6 +170,7 @@ class UserDbService {
       workCategories: const ['Gig Economy'],
       profileCompleteness: 0.85,
       identityStatus: 'Verified',
+      qrCodeData: 'https://gigfolio.app/verify/${user.id}',
     );
   }
 
