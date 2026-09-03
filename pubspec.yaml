@@ -1,0 +1,58 @@
+name: gigfolio
+description: "GigFolio — Portable Digital Identity & Reputation Wallet for Gig Workers"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Navigation
+  go_router: ^14.6.2
+
+  # State Management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # Supabase Auth & DB
+  supabase_flutter: ^2.7.0
+
+  # Secure Storage
+  flutter_secure_storage: ^9.2.2
+
+  # Forms
+  # (Using Flutter built-in TextFormField for MVP)
+
+  # UI
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.5.0
+  shimmer: ^3.0.0
+  cached_network_image: ^3.3.1
+  fl_chart: ^0.69.0
+  percent_indicator: ^4.2.3
+  lottie: ^3.1.2
+
+  # Utils
+  intl: ^0.20.0
+  url_launcher: ^6.3.1
+  share_plus: ^10.0.3
+  image_picker: ^1.1.2
+  package_info_plus: ^8.1.3
+  connectivity_plus: ^6.1.0
+  uuid: ^4.5.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  build_runner: ^2.4.12
+  riverpod_generator: ^2.4.3
+
+flutter:
+  uses-material-design: true
+  # Assets and fonts will be added here when local files are available.
+  # Inter font is loaded at runtime via the google_fonts package.
