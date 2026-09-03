@@ -212,6 +212,25 @@ class PlatformConnection {
     this.jobLabel,
   });
 
+  PlatformConnection copyWith({
+    PlatformConnectionStatus? status,
+    double? rating,
+    int? jobCount,
+    String? jobLabel,
+  }) {
+    return PlatformConnection(
+      id: id,
+      name: name,
+      slug: slug,
+      logoEmoji: logoEmoji,
+      logoColor: logoColor,
+      status: status ?? this.status,
+      rating: rating ?? this.rating,
+      jobCount: jobCount ?? this.jobCount,
+      jobLabel: jobLabel ?? this.jobLabel,
+    );
+  }
+
   String get statusLabel {
     switch (status) {
       case PlatformConnectionStatus.connected: return 'Connected';

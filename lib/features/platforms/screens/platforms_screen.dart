@@ -1,32 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/models/models.dart';
 
-class PlatformsScreen extends StatelessWidget {
-  const PlatformsScreen({super.key});
+final platformsProvider = StateNotifierProvider<PlatformsNotifier, List<PlatformConnection>>((ref) {
+  return PlatformsNotifier();
+});
 
-  static const List<PlatformConnection> _platforms = [
+class PlatformsNotifier extends StateNotifier<List<PlatformConnection>> {
+  PlatformsNotifier() : super(const [
     PlatformConnection(
       id: 'p-uber', name: 'Uber', slug: 'uber',
       logoEmoji: 'U', logoColor: Color(0xFF000000),
       status: PlatformConnectionStatus.notConnected,
     ),
     PlatformConnection(
-      id: 'p-dd', name: 'DoorDash', slug: 'doordash',
-      logoEmoji: 'D', logoColor: Color(0xFFFF3008),
+      id: 'p-zomato', name: 'Zomato', slug: 'zomato',
+      logoEmoji: 'Z', logoColor: Color(0xFFCB202D),
       status: PlatformConnectionStatus.notConnected,
     ),
     PlatformConnection(
-      id: 'p-uw', name: 'Upwork', slug: 'upwork',
-      logoEmoji: 'W', logoColor: Color(0xFF14A800),
+      id: 'p-rapido', name: 'Rapido', slug: 'rapido',
+      logoEmoji: 'R', logoColor: Color(0xFFF9C111),
       status: PlatformConnectionStatus.notConnected,
     ),
-  ];
+    PlatformConnection(
+      id: 'p-urbanclap', name: 'Urban Company', slug: 'urban_company',
+      logoEmoji: 'UC', logoColor: Color(0xFF000000),
+      status: PlatformConnectionStatus.notConnected,
+    ),
+  ]);
+
+  Future<void> connectPlatform(String id) async {
+    // Set to syncing
+    state = state.map((p) => p.id == id ? p.copyWith(status: PlatformConnectionStatus.syncing) : p).toList();
+    
+    // Simulate OAuth delay
+    await Future.delayed(const Duration(seconds: 3));
+
+    // Set to connected with some mock data
+    state = state.map((p) {
+      if (p.id == id) {
+        return p.copyWith(
+          status: PlatformConnectionStatus.connected,
+          rating: 4.8,
+          jobCount: id == 'p-uber' ? 342 : 124,
+          jobLabel: id == 'p-uber' ? 'trips' : 'jobs',
+        );
+      }
+      return p;
+    }).toList();
+  }
+}
+
+class PlatformsScreen extends ConsumerWidget {
+  const PlatformsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final platforms = ref.watch(platformsProvider);
+
     return Scaffold(
       backgroundColor: AppColors.surfaceCanvas,
       body: CustomScrollView(
@@ -49,7 +84,7 @@ class PlatformsScreen extends StatelessWidget {
                 // ── Platform catalog ───────────────────────────────────────────
                 Text('PLATFORM CATALOG', style: AppTextStyles.eyebrow),
                 const SizedBox(height: 10),
-                ..._platforms.asMap().entries.map((e) {
+                ...platforms.asMap().entries.map((e) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _PlatformTile(platform: e.value)
@@ -121,13 +156,15 @@ class _ComingSoonBanner extends StatelessWidget {
   }
 }
 
-class _PlatformTile extends StatelessWidget {
+class _PlatformTile extends ConsumerWidget {
   final PlatformConnection platform;
   const _PlatformTile({required this.platform});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isConnected = platform.status == PlatformConnectionStatus.connected;
+    final isSyncing = platform.status == PlatformConnectionStatus.syncing;
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.canvas,
@@ -169,9 +206,14 @@ class _PlatformTile extends StatelessWidget {
                       '${platform.rating} ★ · ${platform.jobCount} ${platform.jobLabel}',
                       style: AppTextStyles.bodySm.copyWith(color: AppColors.textSecondary),
                     )
+                  else if (isSyncing)
+                    Text(
+                      'Connecting...',
+                      style: AppTextStyles.bodySm.copyWith(color: AppColors.primary),
+                    )
                   else
                     Text(
-                      'Not connected · Coming soon',
+                      'Not connected',
                       style: AppTextStyles.bodySm.copyWith(color: AppColors.textSecondary),
                     ),
                 ],
@@ -181,17 +223,48 @@ class _PlatformTile extends StatelessWidget {
             // Action button
             GestureDetector(
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '${platform.name} integration coming soon.',
-                      style: AppTextStyles.bodyMd.copyWith(color: Colors.white),
+                if (isConnected || isSyncing) return;
+                
+                // Show a dialog simulating OAuth redirect
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: AppColors.canvas,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    title: Text('Connecting to ${platform.name}', style: AppTextStyles.headlineSm),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 16),
+                        const CircularProgressIndicator(color: AppColors.primary),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Simulating OAuth secure connection and fetching verified reputation data.',
+                          style: AppTextStyles.bodyMd.copyWith(color: AppColors.textSecondary),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ),
-                    backgroundColor: AppColors.blockNavy,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 );
+
+                ref.read(platformsProvider.notifier).connectPlatform(platform.id).then((_) {
+                  if (context.mounted) {
+                    Navigator.of(context).pop(); // Close dialog
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '${platform.name} connected successfully!',
+                          style: AppTextStyles.bodyMd.copyWith(color: Colors.white),
+                        ),
+                        backgroundColor: AppColors.statusVerifiedText,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    );
+                  }
+                });
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -202,12 +275,17 @@ class _PlatformTile extends StatelessWidget {
                     color: isConnected ? AppColors.statusVerifiedBorder : AppColors.cardBorder,
                   ),
                 ),
-                child: Text(
-                  isConnected ? 'Connected' : 'Connect',
-                  style: AppTextStyles.labelLg.copyWith(
-                    color: isConnected ? AppColors.statusVerifiedText : AppColors.primary,
-                  ),
-                ),
+                child: isSyncing 
+                    ? const SizedBox(
+                        width: 16, height: 16, 
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)
+                      )
+                    : Text(
+                        isConnected ? 'Connected' : 'Connect',
+                        style: AppTextStyles.labelLg.copyWith(
+                          color: isConnected ? AppColors.statusVerifiedText : AppColors.primary,
+                        ),
+                      ),
               ),
             ),
           ],
