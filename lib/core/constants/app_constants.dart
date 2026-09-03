@@ -51,10 +51,6 @@ class AppConstants {
   static const String appTagline = 'Your Portable Work Identity';
   static const String gigfolioIdBrand = 'Gigfolio ID';
 
-  // Supabase Configuration
-  static const String supabaseUrl = 'https://kblhngnyyaxphzecftet.supabase.co';
-  static const String supabaseAnonKey = 'sb_publishable_SZK2GACanKrb4iI9j0KfVQ_Bq51EW8p';
-
   // API versioning
   static const String apiVersion = 'v1';
   static const String apiBase = '/api/$apiVersion';

@@ -22,14 +22,8 @@ void main() async {
   ]);
 
   // Initialize Supabase Backend
-  const supabaseUrl = String.fromEnvironment(
-    'SUPABASE_URL',
-    defaultValue: 'https://kblhngnyyaxphzecftet.supabase.co',
-  );
-  const supabaseAnonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue: 'sb_publishable_SZK2GACanKrb4iI9j0KfVQ_Bq51EW8p',
-  );
+  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
   await Supabase.initialize(
     url: supabaseUrl,
