@@ -158,7 +158,7 @@ class _ProfileHero extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Gigfolio ID
+          // Supabase UID
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
@@ -172,8 +172,8 @@ class _ProfileHero extends StatelessWidget {
                 const Icon(Icons.fingerprint_rounded, size: 18, color: AppColors.primary),
                 const SizedBox(width: 8),
                 Text(
-                  'GF-${profile.id.toUpperCase()}',
-                  style: AppTextStyles.credentialMono.copyWith(fontSize: 13),
+                  'UID: ${profile.userId}',
+                  style: AppTextStyles.credentialMono.copyWith(fontSize: 11),
                 ),
               ],
             ),
