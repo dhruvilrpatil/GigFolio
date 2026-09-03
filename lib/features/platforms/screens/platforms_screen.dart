@@ -375,8 +375,8 @@ class _PlatformTile extends ConsumerWidget {
 
   void _showOAuthConsentModal(BuildContext context, WidgetRef ref, PlatformConnection platform) {
     final user = ref.read(currentUserProvider);
-    final gigId = user?.id ?? 'gig-auth-id';
-    final gigIdController = TextEditingController(text: gigId);
+    final uid = user?.id ?? 'supabase-uid';
+    final uidController = TextEditingController(text: uid);
     bool isSubmitting = false;
 
     showModalBottomSheet(
@@ -465,15 +465,15 @@ class _PlatformTile extends ConsumerWidget {
                 ),
                 const SizedBox(height: 20),
 
-                // Input GigID
-                Text('Connect via GigID (Supabase ID)', style: AppTextStyles.titleMd),
+                // Input UID
+                Text('Connect via UID (Supabase User ID)', style: AppTextStyles.titleMd),
                 const SizedBox(height: 8),
                 TextField(
-                  controller: gigIdController,
+                  controller: uidController,
                   readOnly: true, // Typically this would be read-only since it's an SSO flow
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.fingerprint_rounded, color: AppColors.textSecondary),
-                    hintText: 'Enter your GigID',
+                    hintText: 'Enter your UID',
                     filled: true,
                     fillColor: AppColors.surfaceContainerLow,
                     border: OutlineInputBorder(
