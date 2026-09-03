@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../shared/providers/auth_providers.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.surfaceCanvas,
       body: CustomScrollView(
@@ -122,7 +124,7 @@ class SettingsScreen extends StatelessWidget {
 
                 // ── Logout button ─────────────────────────────────────────────
                 _LogoutButton(
-                  onTap: () => _handleLogout(context),
+                  onTap: () => _handleLogout(context, ref),
                 ).animate(delay: 320.ms).fadeIn(duration: 400.ms).slideY(begin: 0.2),
               ]),
             ),
@@ -132,10 +134,10 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _handleLogout(BuildContext context) {
+  void _handleLogout(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: AppColors.canvas,
         title: Text('Sign out?', style: AppTextStyles.headlineSm),
@@ -145,13 +147,16 @@ class SettingsScreen extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text('Cancel', style: AppTextStyles.bodyMd.copyWith(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               await Supabase.instance.client.auth.signOut();
+              ref.invalidate(currentUserProvider);
+              ref.invalidate(userProfileProvider);
+              ref.invalidate(userReputationScoreProvider);
               if (context.mounted) {
                 context.go(AppConstants.routeWelcome);
               }

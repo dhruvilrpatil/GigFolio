@@ -38,8 +38,10 @@ class GoRouterRefreshStream extends ChangeNotifier {
 
 /// Current authenticated user
 final currentUserProvider = Provider<User?>((ref) {
-  final authState = ref.watch(authStateChangesProvider).value;
-  return authState?.session?.user ?? ref.watch(supabaseClientProvider).auth.currentUser;
+  final authStateAsync = ref.watch(authStateChangesProvider);
+  final sessionUser = authStateAsync.value?.session?.user;
+  final currentAuthUser = ref.watch(supabaseClientProvider).auth.currentUser;
+  return sessionUser ?? currentAuthUser;
 });
 
 /// Service to handle Supabase DB syncing per user
@@ -236,6 +238,9 @@ final userDbServiceProvider = Provider<UserDbService>((ref) {
 final userProfileProvider = FutureProvider<WorkerProfile>((ref) async {
   final user = ref.watch(currentUserProvider);
   final dbService = ref.watch(userDbServiceProvider);
+  if (user != null) {
+    await dbService.syncUserRecord(user);
+  }
   return dbService.fetchProfile(user);
 });
 
@@ -243,6 +248,9 @@ final userProfileProvider = FutureProvider<WorkerProfile>((ref) async {
 final userReputationScoreProvider = FutureProvider<ReputationScore>((ref) async {
   final user = ref.watch(currentUserProvider);
   final dbService = ref.watch(userDbServiceProvider);
+  if (user != null) {
+    await dbService.syncUserRecord(user);
+  }
   return dbService.fetchReputationScore(user);
 });
 
