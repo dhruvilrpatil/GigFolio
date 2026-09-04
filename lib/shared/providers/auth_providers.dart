@@ -233,6 +233,86 @@ class UserDbService {
       message: '',
     );
   }
+
+  /// Call RPC: get_worker_platform_rating
+  /// Parameters: { p_user_id: workerUserId, p_platform_name: "Rapido" }
+  /// Expected response: { user_id, platform_name, platform_score, tier, total_reviews }
+  Future<Map<String, dynamic>?> getWorkerPlatformRating({
+    required String userId,
+    required String platformName,
+  }) async {
+    try {
+      final response = await _client.rpc('get_worker_platform_rating', params: {
+        'p_user_id': userId,
+        'p_platform_name': platformName,
+      });
+      if (response != null) {
+        if (response is Map) {
+          return Map<String, dynamic>.from(response);
+        } else if (response is List && response.isNotEmpty) {
+          return Map<String, dynamic>.from(response.first as Map);
+        }
+      }
+    } catch (e) {
+      debugPrint('RPC get_worker_platform_rating error ($platformName): $e');
+    }
+    return null;
+  }
+
+  /// Call RPC: get_platform_recent_reviews
+  /// Parameters: { p_user_id: workerUserId, p_platform_name: "Rapido", p_limit: 5 }
+  Future<List<Map<String, dynamic>>> getPlatformRecentReviews({
+    required String userId,
+    required String platformName,
+    int limit = 5,
+  }) async {
+    try {
+      final response = await _client.rpc('get_platform_recent_reviews', params: {
+        'p_user_id': userId,
+        'p_platform_name': platformName,
+        'p_limit': limit,
+      });
+      if (response != null && response is List) {
+        return List<Map<String, dynamic>>.from(
+          response.map((e) => Map<String, dynamic>.from(e as Map)),
+        );
+      }
+    } catch (e) {
+      debugPrint('RPC get_platform_recent_reviews error ($platformName): $e');
+    }
+    return [];
+  }
+
+  /// Call RPC: add_user_rating
+  /// Parameters: { p_user_id, p_rating, p_review, p_platform_name, p_reviewer_name }
+  /// Expected response: { success: true, user_id, new_gig_score, tier, total_reviews }
+  Future<Map<String, dynamic>?> addUserRating({
+    required String userId,
+    required double rating,
+    String? reviewText,
+    required String platformName,
+    String? reviewerName,
+  }) async {
+    try {
+      final response = await _client.rpc('add_user_rating', params: {
+        'p_user_id': userId,
+        'p_rating': rating,
+        'p_review': (reviewText != null && reviewText.trim().isNotEmpty) ? reviewText.trim() : null,
+        'p_platform_name': platformName.trim().isEmpty ? 'Direct Client' : platformName.trim(),
+        'p_reviewer_name': (reviewerName != null && reviewerName.trim().isNotEmpty) ? reviewerName.trim() : 'Anonymous',
+      });
+      if (response != null) {
+        if (response is Map) {
+          return Map<String, dynamic>.from(response);
+        } else if (response is List && response.isNotEmpty) {
+          return Map<String, dynamic>.from(response.first as Map);
+        }
+      }
+    } catch (e) {
+      debugPrint('RPC add_user_rating error: $e');
+    }
+    return null;
+  }
 }
 
 final userDbServiceProvider = Provider<UserDbService>((ref) {

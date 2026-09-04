@@ -205,6 +205,8 @@ class PlatformConnection {
   final double? rating;
   final int? jobCount;
   final String? jobLabel;
+  final String? tier;
+  final List<Map<String, dynamic>>? recentReviews;
 
   const PlatformConnection({
     required this.id,
@@ -216,6 +218,8 @@ class PlatformConnection {
     this.rating,
     this.jobCount,
     this.jobLabel,
+    this.tier,
+    this.recentReviews,
   });
 
   PlatformConnection copyWith({
@@ -223,6 +227,8 @@ class PlatformConnection {
     double? rating,
     int? jobCount,
     String? jobLabel,
+    String? tier,
+    List<Map<String, dynamic>>? recentReviews,
   }) {
     return PlatformConnection(
       id: id,
@@ -234,6 +240,8 @@ class PlatformConnection {
       rating: rating ?? this.rating,
       jobCount: jobCount ?? this.jobCount,
       jobLabel: jobLabel ?? this.jobLabel,
+      tier: tier ?? this.tier,
+      recentReviews: recentReviews ?? this.recentReviews,
     );
   }
 

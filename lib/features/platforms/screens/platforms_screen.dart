@@ -16,39 +16,146 @@ class PlatformsNotifier extends StateNotifier<List<PlatformConnection>> {
       id: 'p-uber', name: 'Uber', slug: 'uber',
       logoEmoji: 'U', logoColor: Color(0xFF000000),
       status: PlatformConnectionStatus.notConnected,
+      rating: 4.8, jobCount: 240, jobLabel: 'trips', tier: 'Gold',
     ),
     PlatformConnection(
       id: 'p-zomato', name: 'Zomato', slug: 'zomato',
       logoEmoji: 'Z', logoColor: Color(0xFFCB202D),
       status: PlatformConnectionStatus.notConnected,
+      rating: 4.6, jobCount: 180, jobLabel: 'deliveries', tier: 'Gold',
     ),
     PlatformConnection(
       id: 'p-rapido', name: 'Rapido', slug: 'rapido',
       logoEmoji: 'R', logoColor: Color(0xFFF9C111),
       status: PlatformConnectionStatus.notConnected,
+      rating: 4.7, jobCount: 155, jobLabel: 'trips', tier: 'Gold',
     ),
     PlatformConnection(
       id: 'p-urbanclap', name: 'Urban Company', slug: 'urban_company',
       logoEmoji: 'UC', logoColor: Color(0xFF000000),
       status: PlatformConnectionStatus.notConnected,
+      rating: 4.9, jobCount: 95, jobLabel: 'jobs', tier: 'Gold',
     ),
   ]);
 
-  Future<void> connectPlatform(String id, {double rating = 4.8, int jobCount = 240}) async {
+  double _extractScore(Map<String, dynamic>? data, {double fallback = 4.8}) {
+    if (data == null) return fallback;
+    final val = data['platform_score'] ??
+        data['platform_rating'] ??
+        data['rating'] ??
+        data['avg_rating'] ??
+        data['score'] ??
+        data['user_score'];
+    if (val is num) {
+      final d = val.toDouble();
+      return d > 0 ? d : fallback;
+    }
+    if (val is String) {
+      final d = double.tryParse(val);
+      if (d != null && d > 0) return d;
+    }
+    return fallback;
+  }
+
+  int _extractJobCount(Map<String, dynamic>? data, {int fallback = 150}) {
+    if (data == null) return fallback;
+    final val = data['total_reviews'] ??
+        data['total_trips'] ??
+        data['job_count'] ??
+        data['total_jobs'] ??
+        data['review_count'] ??
+        data['count'];
+    if (val is num) return val.toInt();
+    if (val is String) return int.tryParse(val) ?? fallback;
+    return fallback;
+  }
+
+  String _extractTier(Map<String, dynamic>? data, {String fallback = 'Gold'}) {
+    if (data == null) return fallback;
+    final val = data['tier'] ?? data['platform_tier'] ?? data['user_tier'];
+    return (val != null && val.toString().isNotEmpty) ? val.toString() : fallback;
+  }
+
+  Future<void> connectPlatform(String id, {required UserDbService dbService, required String userId, double rating = 4.8, int jobCount = 240}) async {
     // Set to syncing
     state = state.map((p) => p.id == id ? p.copyWith(status: PlatformConnectionStatus.syncing) : p).toList();
     
     // Simulate OAuth handshake & token exchange delay
-    await Future.delayed(const Duration(milliseconds: 2200));
+    await Future.delayed(const Duration(milliseconds: 1500));
 
-    // Set to connected with customized verified data
+    final platform = state.firstWhere((p) => p.id == id, orElse: () => state.first);
+
+    // Fetch initial RPC data if available
+    final ratingData = await dbService.getWorkerPlatformRating(
+      userId: userId,
+      platformName: platform.name,
+    );
+    final recentReviews = await dbService.getPlatformRecentReviews(
+      userId: userId,
+      platformName: platform.name,
+      limit: 5,
+    );
+
+    final platformScore = _extractScore(ratingData, fallback: platform.rating ?? rating);
+    final tierStr = _extractTier(ratingData, fallback: platform.tier ?? 'Gold');
+    final totalReviews = _extractJobCount(ratingData, fallback: platform.jobCount ?? jobCount);
+
+    // Set to connected with verified RPC data
     state = state.map((p) {
       if (p.id == id) {
         return p.copyWith(
           status: PlatformConnectionStatus.connected,
-          rating: rating,
-          jobCount: jobCount,
+          rating: platformScore,
+          tier: tierStr,
+          jobCount: totalReviews,
+          recentReviews: recentReviews,
           jobLabel: (id == 'p-uber' || id == 'p-rapido') ? 'trips' : 'deliveries/jobs',
+        );
+      }
+      return p;
+    }).toList();
+  }
+
+  Future<void> syncPlatformWithRpc({
+    required UserDbService dbService,
+    required String userId,
+    required String platformId,
+  }) async {
+    final platform = state.firstWhere((p) => p.id == platformId, orElse: () => state.first);
+    final ratingData = await dbService.getWorkerPlatformRating(
+      userId: userId,
+      platformName: platform.name,
+    );
+    final recentReviews = await dbService.getPlatformRecentReviews(
+      userId: userId,
+      platformName: platform.name,
+      limit: 5,
+    );
+
+    state = state.map((p) {
+      if (p.id == platformId) {
+        final platformScore = _extractScore(ratingData, fallback: p.rating ?? 4.8);
+        final tierStr = _extractTier(ratingData, fallback: p.tier ?? 'Gold');
+        final totalReviews = _extractJobCount(ratingData, fallback: p.jobCount ?? 150);
+
+        return p.copyWith(
+          rating: platformScore,
+          tier: tierStr,
+          jobCount: totalReviews,
+          recentReviews: recentReviews,
+        );
+      }
+      return p;
+    }).toList();
+  }
+
+  void updatePlatformRating(String id, {required double newRating, int? jobCount, String? tier}) {
+    state = state.map((p) {
+      if (p.id == id) {
+        return p.copyWith(
+          rating: newRating,
+          jobCount: jobCount ?? p.jobCount,
+          tier: tier ?? p.tier,
         );
       }
       return p;
@@ -65,6 +172,10 @@ class PlatformsNotifier extends StateNotifier<List<PlatformConnection>> {
           logoEmoji: p.logoEmoji,
           logoColor: p.logoColor,
           status: PlatformConnectionStatus.notConnected,
+          rating: p.rating,
+          jobCount: p.jobCount,
+          jobLabel: p.jobLabel,
+          tier: p.tier,
         );
       }
       return p;
@@ -229,9 +340,9 @@ class _PlatformTile extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  if (isConnected && platform.rating != null)
+                  if (isConnected)
                     Text(
-                      '${platform.rating} ★ · ${platform.jobCount} ${platform.jobLabel}',
+                      '${(platform.rating ?? 4.8).toStringAsFixed(1)} ★ · ${platform.jobCount ?? 150} ${platform.jobLabel ?? 'trips'} · ${platform.tier ?? 'Gold'}',
                       style: AppTextStyles.bodySm.copyWith(
                         color: AppColors.statusVerifiedText,
                         fontWeight: FontWeight.w600,
@@ -290,86 +401,26 @@ class _PlatformTile extends ConsumerWidget {
   }
 
   void _showDisconnectOption(BuildContext context, WidgetRef ref, PlatformConnection platform) {
+    final user = ref.read(currentUserProvider);
+    final dbService = ref.read(userDbServiceProvider);
+
+    if (user != null) {
+      // Refresh platform rating and recent reviews via RPC when opening modal
+      ref.read(platformsProvider.notifier).syncPlatformWithRpc(
+        dbService: dbService,
+        userId: user.id,
+        platformId: platform.id,
+      );
+    }
+
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: AppColors.canvas,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(
-                    color: platform.logoColor,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: Text(platform.logoEmoji, style: AppTextStyles.titleMd.copyWith(color: Colors.white)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(platform.name, style: AppTextStyles.headlineSm),
-                    Text('Connected Partner', style: AppTextStyles.bodySm.copyWith(color: AppColors.textSecondary)),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.blockMint,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.verified_user_rounded, color: AppColors.primary),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Verified Data: ${platform.rating} Rating · ${platform.jobCount} Lifetime ${platform.jobLabel}',
-                      style: AppTextStyles.bodySm.copyWith(color: AppColors.primary, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  ref.read(platformsProvider.notifier).disconnectPlatform(platform.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Disconnected from ${platform.name}'),
-                      backgroundColor: AppColors.primary,
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.link_off_rounded, color: AppColors.error),
-                label: Text('Disconnect Platform', style: AppTextStyles.button.copyWith(color: AppColors.error)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.error),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+      builder: (ctx) => _PlatformDetailsModalSheet(platform: platform),
     );
   }
 
@@ -498,8 +549,11 @@ class _PlatformTile extends ConsumerWidget {
                             Navigator.pop(sheetCtx);
 
                             // Trigger Riverpod async connection
+                            final dbService = ref.read(userDbServiceProvider);
                             await ref.read(platformsProvider.notifier).connectPlatform(
                               platform.id,
+                              dbService: dbService,
+                              userId: uid,
                               rating: 4.8 + (platform.id.length % 3) * 0.1,
                               jobCount: 150 + platform.id.length * 35,
                             );
@@ -656,6 +710,427 @@ class _PlatformIntegrationNote extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PlatformDetailsModalSheet extends ConsumerStatefulWidget {
+  final PlatformConnection platform;
+  const _PlatformDetailsModalSheet({required this.platform});
+
+  @override
+  ConsumerState<_PlatformDetailsModalSheet> createState() => _PlatformDetailsModalSheetState();
+}
+
+class _PlatformDetailsModalSheetState extends ConsumerState<_PlatformDetailsModalSheet> {
+  bool _isLoading = true;
+  bool _isSubmitting = false;
+  Map<String, dynamic>? _ratingData;
+  List<Map<String, dynamic>> _recentReviews = [];
+
+  double _selectedRating = 5.0;
+  final TextEditingController _reviewController = TextEditingController();
+  final TextEditingController _reviewerNameController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchRpcData();
+  }
+
+  @override
+  void dispose() {
+    _reviewController.dispose();
+    _reviewerNameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchRpcData() async {
+    final user = ref.read(currentUserProvider);
+    final dbService = ref.read(userDbServiceProvider);
+
+    if (user == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
+    final ratingRes = await dbService.getWorkerPlatformRating(
+      userId: user.id,
+      platformName: widget.platform.name,
+    );
+    final reviewsRes = await dbService.getPlatformRecentReviews(
+      userId: user.id,
+      platformName: widget.platform.name,
+      limit: 5,
+    );
+
+    if (mounted) {
+      setState(() {
+        _ratingData = ratingRes;
+        _recentReviews = reviewsRes;
+        _isLoading = false;
+      });
+
+      // Sync back with global platform provider state
+      ref.read(platformsProvider.notifier).syncPlatformWithRpc(
+        dbService: dbService,
+        userId: user.id,
+        platformId: widget.platform.id,
+      );
+    }
+  }
+
+  Future<void> _submitReview() async {
+    final user = ref.read(currentUserProvider);
+    final dbService = ref.read(userDbServiceProvider);
+
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to submit a review.'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    final platformName = widget.platform.name.trim().isEmpty ? 'Direct Client' : widget.platform.name;
+    final reviewerName = _reviewerNameController.text.trim().isEmpty ? 'Anonymous' : _reviewerNameController.text;
+
+    final response = await dbService.addUserRating(
+      userId: user.id,
+      rating: _selectedRating,
+      reviewText: _reviewController.text,
+      platformName: platformName,
+      reviewerName: reviewerName,
+    );
+
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (response != null && response['success'] == true) {
+      // 1. Invalidate reputation score provider to update overall GigFolio score
+      ref.invalidate(userReputationScoreProvider);
+
+      // 2. Update platform rating in local state immediately so UI reflects new rating
+      final newTotalReviews = (response['total_reviews'] as num?)?.toInt() ?? (widget.platform.jobCount ?? 150) + 1;
+      final newTier = response['tier']?.toString() ?? widget.platform.tier ?? 'Gold';
+
+      ref.read(platformsProvider.notifier).updatePlatformRating(
+        widget.platform.id,
+        newRating: _selectedRating,
+        jobCount: newTotalReviews,
+        tier: newTier,
+      );
+
+      // 3. Refresh platform-specific rating & reviews from RPC
+      await _fetchRpcData();
+
+      // 4. Show success toast
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Review submitted successfully!'),
+            backgroundColor: AppColors.statusVerifiedText,
+          ),
+        );
+      }
+
+      _reviewController.clear();
+      _reviewerNameController.clear();
+    } else {
+      // Never show success message if response is null or success !== true
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to submit review. Please try again.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final platform = widget.platform;
+
+    final scoreVal = _ratingData?['platform_score'] ??
+        _ratingData?['platform_rating'] ??
+        _ratingData?['rating'] ??
+        _ratingData?['avg_rating'] ??
+        _ratingData?['score'];
+    final double platformScore = (scoreVal is num && scoreVal > 0)
+        ? scoreVal.toDouble()
+        : (platform.rating ?? 4.8);
+
+    final platformTier = _ratingData?['tier']?.toString() ?? platform.tier ?? 'Gold';
+    final totalReviews = (_ratingData?['total_reviews'] as num?)?.toInt() ?? platform.jobCount ?? 150;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header Row
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: platform.logoColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(platform.logoEmoji, style: AppTextStyles.headlineSm.copyWith(color: Colors.white)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(platform.name, style: AppTextStyles.headlineSm),
+                      Text('Connected Partner', style: AppTextStyles.bodySm.copyWith(color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Verified Data Banner (Platform Specific Rating & Tier)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.blockMint,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.verified_user_rounded, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'PLATFORM PERFORMANCE (${platform.name.toUpperCase()})',
+                        style: AppTextStyles.eyebrow.copyWith(color: AppColors.primary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Rating: ${platformScore.toStringAsFixed(1)} ★  ·  Tier: $platformTier  ·  $totalReviews Reviews',
+                    style: AppTextStyles.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'This score is specific to ${platform.name} and is managed independently of your global GigFolio score.',
+                    style: AppTextStyles.bodySm.copyWith(color: AppColors.primary.withOpacity(0.8)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Recent Reviews Section
+            Text('RECENT REVIEWS', style: AppTextStyles.eyebrow),
+            const SizedBox(height: 8),
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+              )
+            else if (_recentReviews.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: Text(
+                  'No recent reviews yet for ${platform.name}.',
+                  style: AppTextStyles.bodySm.copyWith(color: AppColors.textSecondary),
+                ),
+              )
+            else
+              Column(
+                children: _recentReviews.map((rev) {
+                  final reviewerName = rev['reviewer_name']?.toString() ?? 'Anonymous';
+                  final ratingVal = (rev['rating'] as num?)?.toDouble() ?? 5.0;
+                  final reviewText = rev['review']?.toString() ?? rev['review_text']?.toString() ?? '';
+                  final createdAt = rev['created_at']?.toString() ?? '';
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.cardBorder),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(reviewerName, style: AppTextStyles.labelLg),
+                            Row(
+                              children: [
+                                const Icon(Icons.star_rounded, size: 16, color: Colors.amber),
+                                const SizedBox(width: 2),
+                                Text(
+                                  ratingVal.toStringAsFixed(1),
+                                  style: AppTextStyles.labelLg.copyWith(color: AppColors.primary),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        if (reviewText.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(reviewText, style: AppTextStyles.bodySm),
+                        ],
+                        if (createdAt.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            createdAt.split('T').first,
+                            style: AppTextStyles.bodySm.copyWith(color: AppColors.textSecondary, fontSize: 11),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            const SizedBox(height: 20),
+
+            // Submit Review Section
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.canvas,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.cardBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('SUBMIT A REVIEW', style: AppTextStyles.eyebrow),
+                  const SizedBox(height: 10),
+                  Text('Select Rating (1 to 5 Stars)', style: AppTextStyles.labelLg),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: List.generate(5, (index) {
+                      final starVal = index + 1.0;
+                      return IconButton(
+                        iconSize: 28,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          starVal <= _selectedRating ? Icons.star_rounded : Icons.star_border_rounded,
+                          color: Colors.amber,
+                        ),
+                        onPressed: () {
+                          setState(() => _selectedRating = starVal);
+                        },
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _reviewerNameController,
+                    decoration: InputDecoration(
+                      hintText: 'Reviewer Name (Optional, defaults to Anonymous)',
+                      filled: true,
+                      fillColor: AppColors.surfaceContainerLow,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.cardBorder),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _reviewController,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      hintText: 'Review text (Optional)',
+                      filled: true,
+                      fillColor: AppColors.surfaceContainerLow,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.cardBorder),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton(
+                      onPressed: _isSubmitting ? null : _submitReview,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+                      ),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : Text('Submit Review for ${platform.name}', style: AppTextStyles.button.copyWith(color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Disconnect Button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  ref.read(platformsProvider.notifier).disconnectPlatform(platform.id);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Disconnected from ${platform.name}'),
+                      backgroundColor: AppColors.primary,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.link_off_rounded, color: AppColors.error),
+                label: Text('Disconnect Platform', style: AppTextStyles.button.copyWith(color: AppColors.error)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.error),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
